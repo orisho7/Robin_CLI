@@ -46,6 +46,9 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 			var stats server.CpuStat
 			var m server.Metrics
 			var wg sync.WaitGroup
+			server.GetMemoryUsage(&m)
+			server.GetNetUsage(&m)
+			server.GetDiskUsage(&m)
 
 			server.GetCpuName(context.Background(), &m)
 			server.GetcpuTemp(&m)
@@ -67,6 +70,15 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 			stats.LogicCores = m.CpuLcores
 			stats.PhysicalCores = m.CpuPcores
 			stats.Temperature = m.CpuTemp
+			stats.MemoryUsedPercent = m.UsedPercent
+			stats.FreeMemory = m.Free
+			stats.TotalMemory = m.Total
+			stats.BytesSent = m.BytesSent
+			stats.BytesRecv = m.BytesRecv
+			stats.DiskTotal = m.DiskTotal
+			stats.DiskUsed = m.DiskUsed
+			stats.DiskFree = m.DiskFree
+			stats.DiskUsedPercent = m.DiskUsedPercent
 
 			JsonRes, err := json.Marshal(stats)
 			if err != nil {
