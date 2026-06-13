@@ -55,13 +55,40 @@ Robin is a lightweight, real-time observability agent and CLI dashboard for Linu
 
 ## Getting Started
 
-### Prerequisites
+You can either download the pre-built binaries to get started immediately, or build Robin from source if you wish to contribute.
+
+### Option 1: Quick Start (Pre-built Binaries)
+
+The easiest way to run Robin is to download the latest release for your operating system.
+
+1. Go to the [Releases page](https://github.com/orisho7/Robin_CLI/releases) and download the binaries for your OS (Windows, Linux, or macOS).
+2. Extract the downloaded files. You will have two executables:
+   - `robin-agent` (The backend server)
+   - `robin-tui` (The CLI dashboard)
+3. **Start the Backend Agent:**
+   Open your terminal and run the agent:
+   ```bash
+   ./robin-agent
+   ```
+   *(On Windows, run `robin-agent-windows-amd64.exe`)*
+4. **Start the TUI Dashboard:**
+   Open another terminal and run the TUI:
+   ```bash
+   ./robin-tui
+   ```
+   *(On Windows, run `robin-tui-windows-amd64.exe`)*
+
+### Option 2: Build from Source (For Developers & Contributors)
+
+If you prefer to build Robin from source or want to contribute to the project:
+
+#### Prerequisites
 
 - Go 1.22 or higher
-- Linux
+- Linux / macOS / Windows
 - Node.js (optional — only needed for `ROBIN_TUNNEL=1` public tunneling)
 
-### 1. Start the Backend Agent
+#### 1. Start the Backend Agent
 
 ```bash
 cd cmd/robin
@@ -82,7 +109,7 @@ To monitor from another machine:
 ------------------------------------------------------
 ```
 
-### 2. Start the TUI Dashboard
+#### 2. Start the TUI Dashboard
 
 ```bash
 cd cmd/tui
