@@ -158,7 +158,7 @@ func (m SetupModel) View() string {
 	var inner strings.Builder
 
 	// URL input
-	inner.WriteString(setupLabelStyle.Render("Backend URL") + "\n")
+	inner.WriteString(setupLabelStyle.Render("Enter your server URL") + "\n")
 	inner.WriteString(m.input.View() + "\n\n")
 
 	// Status line

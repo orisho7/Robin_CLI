@@ -21,13 +21,13 @@ type HistoryItem struct {
 	LastUsed time.Time `json:"last_used"`
 }
 
-// configPath returns the path to ~/.robin/config.json.
+// configPath returns the path to .robin/config.json in the current directory.
 func configPath() (string, error) {
-	home, err := os.UserHomeDir()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".robin", "config.json"), nil
+	return filepath.Join(cwd, ".robin", "config.json"), nil
 }
 
 // Load reads the config file. Returns an empty Config (not an error) if the

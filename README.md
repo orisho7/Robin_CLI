@@ -20,7 +20,7 @@ Robin is a lightweight, real-time observability agent and CLI dashboard for Linu
 
 - **Auto-Reconnect** — TUI reconnects to the backend automatically if it restarts
 - **Setup Wizard** — On first run, a full-screen styled wizard prompts for the backend URL, tests connectivity, and saves the result
-- **Persistent Config** — Backend URL saved to `~/.robin/config.json`; no need to type it again
+- **Persistent Config** — Backend URL saved to `.robin/config.json`; no need to type it again
 - **Connection History** — Quick-select from last 5 used URLs with human-readable timestamps
 - **LocalTunnel** — One-flag public HTTPS URL via `ROBIN_TUNNEL=1`
 
@@ -89,7 +89,7 @@ cd cmd/tui
 go run .
 ```
 
-**First run:** A full-screen setup wizard appears, asks for the backend URL, and runs a live connection test. The URL is saved to `~/.robin/config.json` — next time the TUI starts instantly.
+**First run:** A full-screen setup wizard appears, asks for the backend URL, and runs a live connection test. The URL is saved to `.robin/config.json` — next time the TUI starts instantly.
 
 **Subsequent runs:** Connect immediately using the saved URL with no input needed.
 
@@ -103,7 +103,7 @@ The TUI resolves the backend URL in this order:
 | -------- | ---------------------- | ------------------------------------- |
 | 1        | `--url` flag           | `go run . --url http://10.0.0.5:8080` |
 | 2        | `ROBIN_URL` env var    | `ROBIN_URL=http://... go run .`       |
-| 3        | `~/.robin/config.json` | Saved from previous run               |
+| 3        | `.robin/config.json` | Saved from previous run               |
 | 4        | Setup wizard           | First-run interactive prompt          |
 | 5        | Fallback               | `http://localhost:8080`               |
 
@@ -220,7 +220,7 @@ Pusher/
     ├── model.go          # Core data types: CpuStat, Metrics
     ├── service.go        # gopsutil-based metric collection
     ├── alert/            # Threshold rule engine + ring buffer of fired events
-    ├── config/           # ~/.robin/config.json read/write + connection history
+    ├── config/           # .robin/config.json read/write + connection history
     ├── health/           # Pure-function health score computation
     ├── history/          # Fixed-capacity ring buffer for sparkline trends
     ├── process/          # /proc-based process list sorted by CPU or memory

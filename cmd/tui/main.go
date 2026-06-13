@@ -21,7 +21,7 @@ func main() {
 	//
 	//  1. --url flag        (explicit override, highest priority)
 	//  2. ROBIN_URL env var (CI / scripted use)
-	//  3. ~/.robin/config.json (saved from a previous run)
+	//  3. .robin/config.json (saved from a previous run)
 	//  4. Interactive setup wizard (first run or --setup)
 	//  5. http://localhost:8080 (absolute fallback)
 
