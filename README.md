@@ -64,7 +64,7 @@ Robin is a lightweight, real-time observability agent and CLI dashboard for Linu
 ### 1. Start the Backend Agent
 
 ```bash
-cd cmd
+cd cmd/robin
 go run .
 ```
 

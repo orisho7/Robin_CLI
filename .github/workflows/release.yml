@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on any tag that starts with 'v', e.g., v1.0.0
+
+permissions:
+  contents: write # Needed to create a GitHub Release and upload assets
+
+jobs:
+  build-and-release:
+    name: Build and Release Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build Windows
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o robin-agent-windows-amd64.exe ./cmd/robin
+          GOOS=windows GOARCH=amd64 go build -o robin-tui-windows-amd64.exe ./cmd/tui
+
+      - name: Build Linux
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o robin-agent-linux-amd64 ./cmd/robin
+          GOOS=linux GOARCH=amd64 go build -o robin-tui-linux-amd64 ./cmd/tui
+
+      - name: Build macOS (Intel & Apple Silicon)
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -o robin-agent-darwin-amd64 ./cmd/robin
+          GOOS=darwin GOARCH=amd64 go build -o robin-tui-darwin-amd64 ./cmd/tui
+          GOOS=darwin GOARCH=arm64 go build -o robin-agent-darwin-arm64 ./cmd/robin
+          GOOS=darwin GOARCH=arm64 go build -o robin-tui-darwin-arm64 ./cmd/tui
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            robin-agent-windows-amd64.exe
+            robin-tui-windows-amd64.exe
+            robin-agent-linux-amd64
+            robin-tui-linux-amd64
+            robin-agent-darwin-amd64
+            robin-tui-darwin-amd64
+            robin-agent-darwin-arm64
+            robin-tui-darwin-arm64
