@@ -118,6 +118,13 @@ func progressBar(percent float64) string {
 
 type metricsMsg server.CpuStat
 
+// connLostMsg is fired when no metric has arrived within the heartbeat window,
+// meaning the backend has likely gone away. The TUI will enter RECONNECTING state.
+type connLostMsg struct{}
+
+// reconnectTickMsg is fired periodically while disconnected to re-probe the backend.
+type reconnectTickMsg struct{}
+
 type model struct {
 	// original fields — untouched
 	metrics server.CpuStat
@@ -147,6 +154,7 @@ type model struct {
 	// connection state: true after first successful metric received
 	connected   bool
 	connectedAt time.Time
+	lastMetricAt time.Time // updated on every metricsMsg; used for heartbeat
 
 	// url configuration and editing
 	urlInput     textinput.Model
@@ -156,10 +164,32 @@ type model struct {
 	streamCancel context.CancelFunc
 }
 
+// heartbeatWindow is how long to wait for a metric before declaring the connection lost.
+const heartbeatWindow = 5 * time.Second
+
+// reconnectInterval is how long to wait between re-probe attempts while disconnected.
+const reconnectInterval = 3 * time.Second
+
 func waitForActivity(ch chan server.CpuStat) tea.Cmd {
 	return func() tea.Msg {
-		return metricsMsg(<-ch)
+		select {
+		case stat, ok := <-ch:
+			if !ok {
+				return connLostMsg{}
+			}
+			return metricsMsg(stat)
+		case <-time.After(heartbeatWindow):
+			// No metric arrived in time — backend may be down.
+			return connLostMsg{}
+		}
 	}
+}
+
+// scheduleReconnect returns a Cmd that fires reconnectTickMsg after reconnectInterval.
+func scheduleReconnect() tea.Cmd {
+	return tea.Tick(reconnectInterval, func(_ time.Time) tea.Msg {
+		return reconnectTickMsg{}
+	})
 }
 
 func (m model) Init() tea.Cmd {
@@ -167,6 +197,7 @@ func (m model) Init() tea.Cmd {
 		textinput.Blink,
 		probeCmd(m.targetURL),
 		pollStressCmd(),
+		waitForActivity(m.ch),
 	)
 }
 
@@ -249,8 +280,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case connLostMsg:
+		// Only act if we haven't received a metric recently (avoids false positives
+		// when a new stream was just started and data hasn't flowed yet).
+		if m.connected && time.Since(m.lastMetricAt) >= heartbeatWindow {
+			m.connected = false
+		}
+		// Drain any stale data in the channel so the new stream has a clean slate.
+		for len(m.ch) > 0 {
+			<-m.ch
+		}
+		// Re-probe after a short delay instead of hammering the server.
+		return m, scheduleReconnect()
+
+	case reconnectTickMsg:
+		if !m.connected && !m.probing {
+			m.probing = true
+			m.probeErr = ""
+			// Cancel the existing stream before starting a fresh one.
+			if m.streamCancel != nil {
+				m.streamCancel()
+			}
+			return m, probeCmd(m.targetURL)
+		}
+		// Already probing or reconnected — just keep the heartbeat alive.
+		return m, waitForActivity(m.ch)
+
 	case metricsMsg:
 		m.metrics = server.CpuStat(msg)
+		m.lastMetricAt = time.Now()
 		if !m.connected {
 			m.connected = true
 			m.connectedAt = time.Now()
@@ -283,31 +341,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case probeResultMsg:
 		m.probing = false
 		if msg.ok {
-			cfg, err := config.Load()
-			if err == nil {
-				config.AddHistory(&cfg, m.urlInput.Value())
-				_ = config.Save(cfg)
+			// Persist history only when this was a manual URL change (urlInput differs from targetURL).
+			if m.urlInput.Value() != "" && m.urlInput.Value() != m.targetURL {
+				cfg, err := config.Load()
+				if err == nil {
+					config.AddHistory(&cfg, m.urlInput.Value())
+					_ = config.Save(cfg)
+				}
+				m.targetURL = m.urlInput.Value()
 			}
 
 			if m.streamCancel != nil {
 				m.streamCancel()
 			}
 
-			newURL := m.urlInput.Value()
 			ctx, cancel := context.WithCancel(context.Background())
 			m.streamCtx = ctx
 			m.streamCancel = cancel
-			m.targetURL = newURL
 			m.connected = false
 			m.connectedAt = time.Time{}
+			m.lastMetricAt = time.Time{}
 			m.metrics = server.CpuStat{} // reset metrics
 
 			m.cursor = 0 // back to Dashboard
 
 			return m, startStreamCmd(m.streamCtx, m.targetURL, m.ch, m.processCh)
 		}
+		// Probe failed — keep the error visible but schedule an automatic retry
+		// so the TUI reconnects as soon as the backend comes back up.
 		m.probeErr = msg.err
-		return m, nil
+		return m, scheduleReconnect()
 
 
 	}
@@ -331,6 +394,9 @@ func (m model) View() string {
 		uptime := time.Since(m.connectedAt).Round(time.Second)
 		connStatus = lipgloss.NewStyle().Foreground(secondaryColor).Bold(true).Render("● LIVE") +
 			lipgloss.NewStyle().Foreground(textMuted).Render(fmt.Sprintf("  %s  uptime %s", m.targetURL, uptime))
+	} else if m.probing {
+		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("#F4A261")).Bold(true).Render("↺ RECONNECTING") +
+			lipgloss.NewStyle().Foreground(textMuted).Render(fmt.Sprintf("  %s", m.targetURL))
 	} else {
 		connStatus = lipgloss.NewStyle().Foreground(alertColor).Bold(true).Render("○ CONNECTING") +
 			lipgloss.NewStyle().Foreground(textMuted).Render(fmt.Sprintf("  %s", m.targetURL))
@@ -339,10 +405,16 @@ func (m model) View() string {
 	// Content
 	var content strings.Builder
 	if m.metrics.Name == "" && m.choices[m.cursor] != "Change URL" {
+		var waitMsg string
+		if m.probing {
+			waitMsg = fmt.Sprintf("↺  Reconnecting to %s — retrying automatically...", m.targetURL)
+		} else if m.probeErr != "" {
+			waitMsg = fmt.Sprintf("○  %s  Retrying in %ds...", m.probeErr, int(reconnectInterval.Seconds()))
+		} else {
+			waitMsg = fmt.Sprintf("○  Connecting to %s...", m.targetURL)
+		}
 		content.WriteString(
-			lipgloss.NewStyle().Foreground(textMuted).Italic(true).Render(
-				fmt.Sprintf("Connecting to %s — ensure the backend is running...", m.targetURL),
-			),
+			lipgloss.NewStyle().Foreground(textMuted).Italic(true).Render(waitMsg),
 		)
 	} else {
 		switch m.choices[m.cursor] {

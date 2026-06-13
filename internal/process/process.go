@@ -1,10 +1,15 @@
 package process
 
 import (
+	"runtime"
 	"sort"
 
 	goproc "github.com/shirou/gopsutil/v4/process"
 )
+
+// logicalCores is the number of logical CPUs visible to the process.
+// Used to normalise gopsutil's per-core CPU% into a 0-100 range.
+var logicalCores = float64(runtime.NumCPU())
 
 // ProcessStat holds a snapshot of a single process's resource usage.
 type ProcessStat struct {
@@ -57,6 +62,7 @@ func collect() ([]ProcessStat, error) {
 
 		name, _ := p.Name()
 		cpu, _ := p.CPUPercent()
+		cpu = cpu / logicalCores // normalise: gopsutil sums across all cores
 		minfo, _ := p.MemoryInfo()
 		mpct, _ := p.MemoryPercent()
 

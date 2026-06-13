@@ -199,13 +199,23 @@ func probeCmd(url string) tea.Cmd {
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Get(url + "/pusher")
 		if err != nil {
-			return probeResultMsg{ok: false, err: err.Error()}
+			errStr := err.Error()
+			if strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "target machine actively refused it") {
+				return probeResultMsg{ok: false, err: "Please ensure your backend server is running."}
+			}
+			if strings.Contains(errStr, "no such host") {
+				return probeResultMsg{ok: false, err: "Invalid URL: host not found."}
+			}
+			if strings.Contains(errStr, "timeout") {
+				return probeResultMsg{ok: false, err: "Connection timed out."}
+			}
+			return probeResultMsg{ok: false, err: "Could not connect to server."}
 		}
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			return probeResultMsg{ok: true}
 		}
-		return probeResultMsg{ok: false, err: fmt.Sprintf("HTTP %d", resp.StatusCode)}
+		return probeResultMsg{ok: false, err: fmt.Sprintf("Server returned HTTP %d", resp.StatusCode)}
 	}
 }
 
